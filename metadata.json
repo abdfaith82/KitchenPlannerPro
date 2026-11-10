@@ -1,0 +1,6 @@
+{
+  "name": "مخطط المطابخ Pro",
+  "description": "استوديو احترافي لتخطيط وتصميم المطابخ ثنائي وثلاثي الأبعاد مع كتالوج الوحدات وحساب التكلفة وطلبات عروض الأسعار",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

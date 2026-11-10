@@ -1,0 +1,295 @@
+{
+  "entities": {
+    "KitchenProject": {
+      "title": "KitchenProject",
+      "description": "A bespoke 2D/3D kitchen layout project created by an authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated user who owns this kitchen project."
+        },
+        "name": {
+          "type": "string",
+          "description": "Title of the kitchen project (1 to 120 characters)."
+        },
+        "shape": {
+          "type": "string",
+          "description": "Kitchen layout shape (L_SHAPE, U_SHAPE, ISLAND, GALLEY, SINGLE_WALL).",
+          "enum": ["L_SHAPE", "U_SHAPE", "ISLAND", "GALLEY", "SINGLE_WALL"]
+        },
+        "styleId": {
+          "type": "string",
+          "description": "Architectural style preset identifier."
+        },
+        "roomWidthCm": {
+          "type": "integer",
+          "description": "Room width in centimeters (150 to 1200)."
+        },
+        "roomDepthCm": {
+          "type": "integer",
+          "description": "Room depth in centimeters (150 to 1200)."
+        },
+        "roomHeightCm": {
+          "type": "integer",
+          "description": "Room ceiling height in centimeters (200 to 450)."
+        },
+        "cabinetFinish": {
+          "type": "string",
+          "description": "Selected cabinet front material and color finish."
+        },
+        "countertopMaterial": {
+          "type": "string",
+          "description": "Selected countertop surface material."
+        },
+        "handleStyle": {
+          "type": "string",
+          "description": "Selected cabinet handle hardware style."
+        },
+        "wallColorHex": {
+          "type": "string",
+          "description": "Hex color code for room walls."
+        },
+        "floorMaterial": {
+          "type": "string",
+          "description": "Selected flooring material."
+        },
+        "itemsData": {
+          "type": "string",
+          "description": "Compact pipe-delimited string encoding placed kitchen modules, coordinates, dimensions, rotation, and unit prices."
+        },
+        "totalPriceSar": {
+          "type": "integer",
+          "description": "Calculated total Bill of Materials (BOM) price in SAR."
+        },
+        "ergonomicScore": {
+          "type": "integer",
+          "description": "Calculated NKBA Work Triangle ergonomic score (0 to 100)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Architectural notes or custom specifications for the kitchen project."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the project was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the project was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "shape",
+        "styleId",
+        "roomWidthCm",
+        "roomDepthCm",
+        "roomHeightCm",
+        "cabinetFinish",
+        "countertopMaterial",
+        "handleStyle",
+        "wallColorHex",
+        "floorMaterial",
+        "itemsData",
+        "totalPriceSar",
+        "ergonomicScore",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QuoteRequest": {
+      "title": "QuoteRequest",
+      "description": "A formal request for manufacturing quote and consultation sent to a certified kitchen showroom.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated user submitting the quote request."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Document ID of the associated KitchenProject owned by the user."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Snapshot name of the kitchen project."
+        },
+        "showroomName": {
+          "type": "string",
+          "description": "Selected certified kitchen showroom or manufacturer name."
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Full name of the customer requesting the quote."
+        },
+        "customerPhone": {
+          "type": "string",
+          "description": "Phone number of the customer."
+        },
+        "city": {
+          "type": "string",
+          "description": "Delivery and installation city."
+        },
+        "preferredInstallWindow": {
+          "type": "string",
+          "description": "Preferred timeline for kitchen manufacturing and installation."
+        },
+        "estimatedBudgetSar": {
+          "type": "integer",
+          "description": "Estimated project budget in SAR."
+        },
+        "specialNotes": {
+          "type": "string",
+          "description": "Special site measurement or appliance integration notes."
+        },
+        "status": {
+          "type": "string",
+          "description": "Lifecycle status of the quote request.",
+          "enum": ["pending", "cancelled", "completed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the quote request was submitted (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the quote request was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "projectId",
+        "projectName",
+        "showroomName",
+        "customerName",
+        "customerPhone",
+        "city",
+        "preferredInstallWindow",
+        "estimatedBudgetSar",
+        "specialNotes",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "KitchenCatalogUnit": {
+      "title": "KitchenCatalogUnit",
+      "description": "A modular kitchen unit (cabinet, countertop island, oven, refrigerator, dishwasher, or sink) stored in the Firestore catalog.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated user who owns this catalog item."
+        },
+        "code": {
+          "type": "string",
+          "description": "3D renderer module type code (SINK, STOVE, FRIDGE, DISHWASHER, BASE_DRAWERS, BASE_60, CORNER_BASE, WALL_GLASS, WALL_60, TALL_PANTRY, TALL_OVEN, ISLAND_MAIN)."
+        },
+        "nameAr": {
+          "type": "string",
+          "description": "Arabic display title of the kitchen unit."
+        },
+        "category": {
+          "type": "string",
+          "description": "Unit category (BASE, WALL, TALL, ISLAND, APPLIANCE, SINK).",
+          "enum": ["BASE", "WALL", "TALL", "ISLAND", "APPLIANCE", "SINK"]
+        },
+        "subType": {
+          "type": "string",
+          "description": "Specific unit subtype (CABINET, COUNTERTOP, OVEN, FRIDGE, DISHWASHER, SINK, ISLAND)."
+        },
+        "widthCm": {
+          "type": "integer",
+          "description": "Default width in centimeters (30 to 300)."
+        },
+        "depthCm": {
+          "type": "integer",
+          "description": "Default depth in centimeters (25 to 150)."
+        },
+        "heightCm": {
+          "type": "integer",
+          "description": "Default height in centimeters (30 to 260)."
+        },
+        "elevationCm": {
+          "type": "integer",
+          "description": "Mounting elevation from floor in centimeters (0 to 220)."
+        },
+        "priceSar": {
+          "type": "integer",
+          "description": "Unit price in SAR."
+        },
+        "colorHex": {
+          "type": "integer",
+          "description": "ARGB color integer for 2D/3D accent."
+        },
+        "materialFinish": {
+          "type": "string",
+          "description": "Default material finish description."
+        },
+        "countertopIncluded": {
+          "type": "boolean",
+          "description": "Whether this unit includes a countertop surface slab."
+        },
+        "descriptionAr": {
+          "type": "string",
+          "description": "Detailed specifications of the kitchen unit."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the catalog unit was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the catalog unit was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "code",
+        "nameAr",
+        "category",
+        "subType",
+        "widthCm",
+        "depthCm",
+        "heightCm",
+        "elevationCm",
+        "priceSar",
+        "colorHex",
+        "materialFinish",
+        "countertopIncluded",
+        "descriptionAr",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/kitchen_projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/KitchenProject"
+      },
+      "description": "Stores user-authored 2D/3D kitchen layout projects, materials, BOM prices, and ergonomic scores."
+    },
+    "/quote_requests/{quoteId}": {
+      "schema": {
+        "$ref": "#/entities/QuoteRequest"
+      },
+      "description": "Stores showroom quote and manufacturing consultation requests linked to a user's kitchen project."
+    },
+    "/kitchen_units_catalog/{unitId}": {
+      "schema": {
+        "$ref": "#/entities/KitchenCatalogUnit"
+      },
+      "description": "Stores the Firestore catalog of kitchen units (cabinets, countertops, islands, ovens, refrigerators, dishwashers, and sinks) for the authenticated user."
+    }
+  }
+}

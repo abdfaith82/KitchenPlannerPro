@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">مخطط المطابخ Pro</string>
+    <string name="auth_hero_subtitle">استوديو التصميم المعماري ثلاثي الأبعاد وحساب التكلفة الفوري</string>
+    <string name="sign_in_with_google">Sign in with Google — تسجيل الدخول عبر Google</string>
+    <string name="bypass_google_sign_in">تخطي تسجيل الدخول • الدخول المباشر للاستوديو 3D</string>
+    <string name="cd_hero_kitchen_banner">بانر تصميم المطبخ الفاخر</string>
+    <string name="tab_studio">الاستوديو 2D/3D</string>
+    <string name="tab_projects">القوالب ومشاريعي</string>
+    <string name="tab_catalog">الكتالوج والخامات</string>
+    <string name="tab_bom_quotes">التكلفة والتسعير</string>
+    <string name="save_cloud">حفظ التصميم 3D في السحابة</string>
+    <string name="sign_out">خروج</string>
+</resources>

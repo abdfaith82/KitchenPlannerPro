@@ -1,0 +1,246 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Scoped Guest Studio session when user explicitly chooses "Bypass Google Sign-In"
+    function isGuestStudioUser(userId) {
+      return request.auth == null &&
+             userId is string &&
+             userId.size() >= 14 &&
+             userId.size() <= 64 &&
+             userId.matches('^guest_studio_[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAuthorizedOwner(userId) {
+      return (isSignedIn() && userId == request.auth.uid) || isGuestStudioUser(userId);
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidKitchenShape(shape) {
+      return shape is string &&
+             shape.size() <= 40 &&
+             (shape == 'L_SHAPE' || shape == 'U_SHAPE' || shape == 'ISLAND' || shape == 'GALLEY' || shape == 'SINGLE_WALL');
+    }
+
+    function isValidUnitCategory(cat) {
+      return cat is string &&
+             cat.size() <= 30 &&
+             (cat == 'BASE' || cat == 'WALL' || cat == 'TALL' || cat == 'ISLAND' || cat == 'APPLIANCE' || cat == 'SINK');
+    }
+
+    // Standalone Validation Helper for KitchenProject
+    function isValidKitchenProject(data) {
+      return data.keys().hasAll([
+               'userId', 'name', 'shape', 'styleId',
+               'roomWidthCm', 'roomDepthCm', 'roomHeightCm',
+               'cabinetFinish', 'countertopMaterial', 'handleStyle',
+               'wallColorHex', 'floorMaterial', 'itemsData',
+               'totalPriceSar', 'ergonomicScore', 'notes',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'name', 'shape', 'styleId',
+               'roomWidthCm', 'roomDepthCm', 'roomHeightCm',
+               'cabinetFinish', 'countertopMaterial', 'handleStyle',
+               'wallColorHex', 'floorMaterial', 'itemsData',
+               'totalPriceSar', 'ergonomicScore', 'notes',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isAuthorizedOwner(data.userId) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+             isValidKitchenShape(data.shape) &&
+             data.styleId is string && data.styleId.size() >= 1 && data.styleId.size() <= 40 &&
+             data.roomWidthCm is int && data.roomWidthCm >= 150 && data.roomWidthCm <= 1200 &&
+             data.roomDepthCm is int && data.roomDepthCm >= 150 && data.roomDepthCm <= 1200 &&
+             data.roomHeightCm is int && data.roomHeightCm >= 200 && data.roomHeightCm <= 450 &&
+             data.cabinetFinish is string && data.cabinetFinish.size() >= 1 && data.cabinetFinish.size() <= 80 &&
+             data.countertopMaterial is string && data.countertopMaterial.size() >= 1 && data.countertopMaterial.size() <= 80 &&
+             data.handleStyle is string && data.handleStyle.size() >= 1 && data.handleStyle.size() <= 80 &&
+             data.wallColorHex is string && data.wallColorHex.size() >= 4 && data.wallColorHex.size() <= 12 &&
+             data.floorMaterial is string && data.floorMaterial.size() >= 1 && data.floorMaterial.size() <= 80 &&
+             data.itemsData is string && data.itemsData.size() <= 20000 &&
+             data.totalPriceSar is int && data.totalPriceSar >= 0 && data.totalPriceSar <= 10000000 &&
+             data.ergonomicScore is int && data.ergonomicScore >= 0 && data.ergonomicScore <= 100 &&
+             data.notes is string && data.notes.size() <= 1000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Standalone Validation Helper for QuoteRequest
+    function isValidQuoteRequest(data) {
+      return data.keys().hasAll([
+               'userId', 'projectId', 'projectName', 'showroomName',
+               'customerName', 'customerPhone', 'city',
+               'preferredInstallWindow', 'estimatedBudgetSar',
+               'specialNotes', 'status', 'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'projectId', 'projectName', 'showroomName',
+               'customerName', 'customerPhone', 'city',
+               'preferredInstallWindow', 'estimatedBudgetSar',
+               'specialNotes', 'status', 'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isAuthorizedOwner(data.userId) &&
+             isValidId(data.projectId) &&
+             data.projectName is string && data.projectName.size() >= 1 && data.projectName.size() <= 120 &&
+             data.showroomName is string && data.showroomName.size() >= 1 && data.showroomName.size() <= 120 &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100 &&
+             data.customerPhone is string && data.customerPhone.size() >= 5 && data.customerPhone.size() <= 30 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.preferredInstallWindow is string && data.preferredInstallWindow.size() >= 1 && data.preferredInstallWindow.size() <= 80 &&
+             data.estimatedBudgetSar is int && data.estimatedBudgetSar >= 0 && data.estimatedBudgetSar <= 10000000 &&
+             data.specialNotes is string && data.specialNotes.size() <= 1000 &&
+             data.status is string && data.status.size() <= 20 &&
+             (data.status == 'pending' || data.status == 'cancelled' || data.status == 'completed') &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Standalone Validation Helper for KitchenCatalogUnit
+    function isValidKitchenCatalogUnit(data) {
+      return data.keys().hasAll([
+               'userId', 'code', 'nameAr', 'category', 'subType',
+               'widthCm', 'depthCm', 'heightCm', 'elevationCm',
+               'priceSar', 'colorHex', 'materialFinish',
+               'countertopIncluded', 'descriptionAr',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'code', 'nameAr', 'category', 'subType',
+               'widthCm', 'depthCm', 'heightCm', 'elevationCm',
+               'priceSar', 'colorHex', 'materialFinish',
+               'countertopIncluded', 'descriptionAr',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isAuthorizedOwner(data.userId) &&
+             data.code is string && data.code.size() >= 1 && data.code.size() <= 40 &&
+             data.nameAr is string && data.nameAr.size() >= 1 && data.nameAr.size() <= 120 &&
+             isValidUnitCategory(data.category) &&
+             data.subType is string && data.subType.size() >= 1 && data.subType.size() <= 40 &&
+             data.widthCm is int && data.widthCm >= 30 && data.widthCm <= 300 &&
+             data.depthCm is int && data.depthCm >= 25 && data.depthCm <= 150 &&
+             data.heightCm is int && data.heightCm >= 30 && data.heightCm <= 260 &&
+             data.elevationCm is int && data.elevationCm >= 0 && data.elevationCm <= 220 &&
+             data.priceSar is int && data.priceSar >= 0 && data.priceSar <= 500000 &&
+             data.colorHex is int &&
+             data.materialFinish is string && data.materialFinish.size() >= 1 && data.materialFinish.size() <= 80 &&
+             data.countertopIncluded is bool &&
+             data.descriptionAr is string && data.descriptionAr.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Collection 1: /kitchen_projects/{projectId}
+    match /kitchen_projects/{projectId} {
+      allow get: if isValidId(projectId) &&
+                    isAuthorizedOwner(existing().userId);
+
+      allow list: if isAuthorizedOwner(existing().userId);
+
+      allow create: if isValidId(projectId) &&
+                       isValidKitchenProject(incoming());
+
+      allow update: if isValidId(projectId) &&
+                       isValidKitchenProject(incoming()) &&
+                       isAuthorizedOwner(existing().userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'shape', 'styleId',
+                         'roomWidthCm', 'roomDepthCm', 'roomHeightCm',
+                         'cabinetFinish', 'countertopMaterial', 'handleStyle',
+                         'wallColorHex', 'floorMaterial', 'itemsData',
+                         'totalPriceSar', 'ergonomicScore', 'notes', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(projectId) &&
+                       isAuthorizedOwner(existing().userId);
+    }
+
+    // Collection 2: /quote_requests/{quoteId}
+    match /quote_requests/{quoteId} {
+      allow get: if isValidId(quoteId) &&
+                    isAuthorizedOwner(existing().userId);
+
+      allow list: if isAuthorizedOwner(existing().userId);
+
+      allow create: if isValidId(quoteId) &&
+                       isValidQuoteRequest(incoming()) &&
+                       incoming().status == 'pending' &&
+                       exists(/databases/$(database)/documents/kitchen_projects/$(incoming().projectId)) &&
+                       get(/databases/$(database)/documents/kitchen_projects/$(incoming().projectId)).data.userId == incoming().userId;
+
+      allow update: if isValidId(quoteId) &&
+                       isValidQuoteRequest(incoming()) &&
+                       isAuthorizedOwner(existing().userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().projectId == existing().projectId &&
+                       incoming().createdAt == existing().createdAt &&
+                       existing().status == 'pending' && (
+                         // Action 1: Cancel Quote Request (transitions to terminal 'cancelled' state)
+                         (incoming().status == 'cancelled' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                         // Action 2: Edit Contact / Notes while pending
+                         (incoming().status == 'pending' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'customerName', 'customerPhone', 'city',
+                            'preferredInstallWindow', 'specialNotes', 'updatedAt'
+                          ]))
+                       );
+
+      allow delete: if isValidId(quoteId) &&
+                       isAuthorizedOwner(existing().userId);
+    }
+
+    // Collection 3: /kitchen_units_catalog/{unitId}
+    match /kitchen_units_catalog/{unitId} {
+      allow get: if isValidId(unitId) &&
+                    isAuthorizedOwner(existing().userId);
+
+      allow list: if isAuthorizedOwner(existing().userId);
+
+      allow create: if isValidId(unitId) &&
+                       isValidKitchenCatalogUnit(incoming());
+
+      allow update: if isValidId(unitId) &&
+                       isValidKitchenCatalogUnit(incoming()) &&
+                       isAuthorizedOwner(existing().userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'nameAr', 'widthCm', 'depthCm', 'heightCm',
+                         'elevationCm', 'priceSar', 'colorHex',
+                         'materialFinish', 'countertopIncluded',
+                         'descriptionAr', 'updatedAt'
+                       ]);
+
+      allow delete: if isValidId(unitId) &&
+                       isAuthorizedOwner(existing().userId);
+    }
+  }
+}
