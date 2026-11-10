@@ -22,11 +22,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Prepare Keystore & Environment
+        run: |
+          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+          sed -i 's/^[[:space:]]*alias(libs\.plugins\.google\.devtools\.ksp)/  \/\/ alias(libs.plugins.google.devtools.ksp)/g' app/build.gradle.kts build.gradle.kts || true
+          sed -i 's/^[[:space:]]*"ksp"(libs\.androidx\.room\.compiler)/  \/\/ "ksp"(libs.androidx.room.compiler)/g' app/build.gradle.kts || true
+          rm -rf app/build/generated/ksp
+
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+        env:
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
+        run: gradle assembleDebug --no-configuration-cache --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: KitchenPlannerPro-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
