@@ -1,5 +1,5 @@
 {
-  "summary":  "تفاصيل وبيانات حزمة APK المبنية لتطبيق مخطط المطابخ الهندسي ثلاثي الأبعاد (Kitchen 3D/2D CAD & CAM Planner Pro) مع مسارات التحميل المباشر وبصمة التحقق SHA-256.",
-  "updatedAt":  "2026-11-09T18:48:43.378204451Z",
+  "summary":  "تقرير إصدار حزمة التطبيق (app-debug.apk / KitchenPlannerPro-debug.apk) المحدثة بعد إزالة KSP بالكامل وإصلاح البناء السحابي على GitHub Actions (JDK 21 + Gradle 9.3.1 + AGP 9.1.1).",
+  "updatedAt":  "2026-11-11T07:57:31.185343113Z",
   "userFacing":  true
 }

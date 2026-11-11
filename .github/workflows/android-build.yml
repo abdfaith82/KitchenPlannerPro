@@ -2,7 +2,9 @@ name: Android Cloud APK Builder
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
   workflow_dispatch:
 
 jobs:
@@ -12,35 +14,50 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Android SDK & Accept Licenses
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
       - name: Prepare Keystore & Environment
         run: |
-          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              base64 -d debug.keystore.base64 > debug.keystore
+            else
+              keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            fi
           fi
-          if [ ! -f .env ] && [ -f .env.example ]; then
-            cp .env.example .env
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              echo "GEMINI_API_KEY=" > .env
+            fi
           fi
-          sed -i 's/^[[:space:]]*alias(libs\.plugins\.google\.devtools\.ksp)/  \/\/ alias(libs.plugins.google.devtools.ksp)/g' app/build.gradle.kts build.gradle.kts || true
-          sed -i 's/^[[:space:]]*"ksp"(libs\.androidx\.room\.compiler)/  \/\/ "ksp"(libs.androidx.room.compiler)/g' app/build.gradle.kts || true
+          sed -i '/google\.devtools\.ksp/d' app/build.gradle.kts build.gradle.kts 2>/dev/null || true
+          sed -i '/androidx\.room\.compiler/d' app/build.gradle.kts 2>/dev/null || true
+          sed -i '/moshi\.kotlin\.codegen/d' app/build.gradle.kts 2>/dev/null || true
           rm -rf app/build/generated/ksp
 
       - name: Build Debug APK
         env:
           JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
-        run: gradle assembleDebug --no-configuration-cache --stacktrace
+        run: gradle :app:assembleDebug --no-configuration-cache --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: KitchenPlannerPro-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
