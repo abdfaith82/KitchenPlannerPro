@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -84,20 +87,98 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.KitchenPlannerViewModel
 import com.example.ai.configureAppCheck
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
 
+/**
+ * بدون google-services.json لا يُهيَّأ FirebaseApp تلقائياً، فيرمي أول استدعاء لـ Firebase.app/Firebase.auth
+ * استثناء IllegalStateException ويُغلق التطبيق عند الإقلاع. نهيّئ هنا خياراً احتياطياً (بدون خدمات سحابية فعلية)
+ * ليعمل الاستوديو محلياً/كضيف، وعند وجود google-services.json تُستخدم إعداداته الحقيقية دون تغيير.
+ */
+fun ensureFirebaseInitialized(context: Context) {
+    runCatching {
+        if (FirebaseApp.getApps(context).isEmpty()) {
+            val options = FirebaseOptions.Builder()
+                .setApplicationId("1:000000000000:android:0000000000000000")
+                .setApiKey("offline-placeholder-key")
+                .setProjectId("kitchen-planner-offline")
+                .build()
+            FirebaseApp.initializeApp(context.applicationContext, options)
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configureAppCheck(this, intent)
+        installCrashReporter(this)
+        val previousCrash = takeLastCrashReport(this)
+        ensureFirebaseInitialized(this)
+        // App Check اختياري: أي فشل فيه يجب ألا يُغلق التطبيق
+        runCatching { configureAppCheck(this, intent) }
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                AppNavigation()
+                var crashText by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(previousCrash)
+                }
+                val shown = crashText
+                if (shown != null) {
+                    CrashReportScreen(report = shown, onContinue = { crashText = null })
+                } else {
+                    AppNavigation()
+                }
             }
+        }
+    }
+}
+
+private const val CRASH_FILE = "last_crash_report.txt"
+
+/** يحفظ سبب أي تعطل غير ملتقط في ملف ليُعرض في التشغيل التالي (للتشخيص بدون adb). */
+fun installCrashReporter(context: Context) {
+    val appContext = context.applicationContext
+    val previous = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        runCatching {
+            java.io.File(appContext.filesDir, CRASH_FILE)
+                .writeText("Thread: ${thread.name}\n" + android.util.Log.getStackTraceString(throwable).take(12000))
+        }
+        previous?.uncaughtException(thread, throwable)
+    }
+}
+
+fun takeLastCrashReport(context: Context): String? = runCatching {
+    val f = java.io.File(context.filesDir, CRASH_FILE)
+    if (f.exists()) f.readText().also { f.delete() } else null
+}.getOrNull()
+
+@Composable
+fun CrashReportScreen(report: String, onContinue: () -> Unit) {
+    androidx.compose.foundation.layout.Column(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(16.dp)
+    ) {
+        androidx.compose.material3.Text(
+            "تعطّل التطبيق في التشغيل السابق — انسخ النص التالي وأرسله للمطوّر",
+            style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+        )
+        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.height(8.dp))
+        androidx.compose.foundation.text.selection.SelectionContainer(
+            modifier = androidx.compose.ui.Modifier
+                .weight(1f)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+        ) {
+            androidx.compose.material3.Text(report, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+        }
+        androidx.compose.material3.Button(onClick = onContinue, modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+            androidx.compose.material3.Text("متابعة")
         }
     }
 }
