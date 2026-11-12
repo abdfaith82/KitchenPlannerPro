@@ -1,7 +1,6 @@
 package com.example
 
 import android.content.Context
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.cam.CamNestingEngine
 import com.example.data.cam.JsonCadEngine
@@ -35,9 +34,7 @@ class ExampleRobolectricTest {
     @Test
     fun `offline room database saves and retrieves auto-save snapshots`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val db = Room.inMemoryDatabaseBuilder(context, LocalKitchenDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        val db = LocalKitchenDatabase.createInMemory(context)
         val repo = LocalSnapshotRepository(db.projectSnapshotDao())
 
         val snapshot = LocalProjectSnapshotEntity(

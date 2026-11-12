@@ -50,6 +50,7 @@ import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Converts a local canvas pointer Offset into exact 1mm room coordinates (desiredXMm, desiredYMm)
@@ -1286,6 +1287,21 @@ private fun findClosest3DItemWithinRadius(
  * recessed 10cm toe-kick plinths, marble backsplash veins, architectural window with sunbeams,
  * ceiling recessed spotlights, CNC 2mm door reveals, Gola aluminum channels, and 3000K vitrine glass reflections.
  */
+/**
+ * إعدادات الإضاءة الحالية للمشهد ثلاثي الأبعاد (تُضبط مرة واحدة في بداية كل إطار رسم).
+ * تُستخدم داخل drawPbrIsoBox لحساب إضاءة Lambert لكل وجه بدل الاعتماد على ألوان مظلَّلة يدوياً.
+ */
+private object SceneShading {
+    var yawDeg: Float = -34f
+    var lightX: Float = -0.45f   // اتجاه الضوء (من السطح نحو المصدر)
+    var lightY: Float = -0.55f
+    var lightZ: Float = 0.70f
+    var ambient: Float = 0.62f
+    var diffuse: Float = 0.46f
+    var tint: Color = Color.White
+    var tintStrength: Float = 0.0f
+}
+
 private fun DrawScope.draw3DPhotorealisticScene(
     state: PlannerStudioState,
     previewDragItem: PlacedKitchenItem? = null,
@@ -1336,6 +1352,29 @@ private fun DrawScope.draw3DPhotorealisticScene(
     val shadowDxCm = (sunDirX * 14f * lightSim.shadowSoftnessAndDepth).coerceIn(-18f, 20f)
     val shadowDyCm = (sunDirY * 15f * lightSim.shadowSoftnessAndDepth).coerceIn(4f, 22f)
     val complianceAlertsByUnit3D = state.complianceReport.alerts.groupBy { it.affectedUnitUid }
+
+    // ضبط إضاءة المشهد: الضوء يأتي عكس اتجاه إزاحة الظل
+    run {
+        val lx = -sunDirX
+        val ly = -sunDirY
+        val lz = 0.95f
+        val len = sqrt(lx * lx + ly * ly + lz * lz).coerceAtLeast(0.001f)
+        SceneShading.yawDeg = state.cameraYawDeg
+        SceneShading.lightX = lx / len
+        SceneShading.lightY = ly / len
+        SceneShading.lightZ = lz / len
+        if (isNightLed) {
+            SceneShading.ambient = 0.52f
+            SceneShading.diffuse = 0.16f
+            SceneShading.tint = Color(0xFFFFC46B)
+            SceneShading.tintStrength = 0.10f
+        } else {
+            SceneShading.ambient = (0.50f + (1f - lightSim.naturalLightIntensity) * 0.12f).coerceIn(0.48f, 0.66f)
+            SceneShading.diffuse = (0.20f + lightSim.naturalLightIntensity * 0.42f).coerceIn(0.18f, 0.66f)
+            SceneShading.tint = kelvinColor
+            SceneShading.tintStrength = 0.07f
+        }
+    }
 
     // 1. Draw 3D Room Floor Slab with PBR Directional Gradient & Specular Sheen
     val floorBaseHex = KitchenCatalogData.resolveFloorColorHex(state.floorMaterial)
@@ -1687,7 +1726,15 @@ private fun DrawScope.draw3DPhotorealisticScene(
                     lineTo(sh3.x, sh3.y)
                     close()
                 }
-                drawPath(castShadowPath, Color.Black.copy(alpha = castShadowAlpha))
+                // ظل ناعم: ملء مركزي + هالة شبه ظلية متدرجة (penumbra) بدل حافة حادة
+                drawPath(castShadowPath, Color.Black.copy(alpha = castShadowAlpha * 0.62f))
+                for (ring in 1..3) {
+                    drawPath(
+                        path = castShadowPath,
+                        color = Color.Black.copy(alpha = castShadowAlpha * 0.20f / ring),
+                        style = Stroke(width = 5f + ring * 6f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                    )
+                }
 
                 // Tight Contact Ambient Occlusion (AO) directly under unit footprint
                 val ao0 = proj(x0 - 1f, y0 - 1f, 0.4f)
@@ -2487,6 +2534,19 @@ private fun DrawScope.draw3DPhotorealisticScene(
             paint = ghostPaint
         )
     }
+
+    // تدرّج إضاءة نهائي (Vignette): تعتيم خفيف للحواف يعطي عمقاً وتركيزاً على المطبخ كما في الصور الفوتوغرافية
+    if (!isWire) {
+        val vignetteAlpha = if (isNightLed) 0.42f else 0.20f
+        val vignetteRadius = hypot(size.width, size.height) * 0.62f
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = vignetteAlpha)),
+                center = Offset(size.width / 2f, size.height * 0.52f),
+                radius = vignetteRadius
+            )
+        )
+    }
 }
 
 /**
@@ -2540,7 +2600,7 @@ private fun DrawScope.drawPbrIsoBox(
     strokeColor: Color,
     strokeWidth: Float,
     wireframeOnly: Boolean,
-    cameraYawDeg: Float = -34f,
+    cameraYawDeg: Float = Float.NaN,
     proj: (Float, Float, Float) -> Offset
 ) {
     val b0 = proj(x0, y0, z0)
@@ -2553,117 +2613,114 @@ private fun DrawScope.drawPbrIsoBox(
     val t2 = proj(x1, y1, z1)
     val t3 = proj(x0, y1, z1)
 
-    val faceBottom = Path().apply {
-        moveTo(b0.x, b0.y); lineTo(b1.x, b1.y); lineTo(b2.x, b2.y); lineTo(b3.x, b3.y); close()
-    }
-    val faceBack = Path().apply {
-        moveTo(b0.x, b0.y); lineTo(b1.x, b1.y); lineTo(t1.x, t1.y); lineTo(t0.x, t0.y); close()
-    }
-    val faceLeft = Path().apply {
-        moveTo(b0.x, b0.y); lineTo(b3.x, b3.y); lineTo(t3.x, t3.y); lineTo(t0.x, t0.y); close()
-    }
-    val faceRight = Path().apply {
-        moveTo(b1.x, b1.y); lineTo(b2.x, b2.y); lineTo(t2.x, t2.y); lineTo(t1.x, t1.y); close()
-    }
-    val faceFront = Path().apply {
-        moveTo(b3.x, b3.y); lineTo(b2.x, b2.y); lineTo(t2.x, t2.y); lineTo(t3.x, t3.y); close()
-    }
-    val faceTop = Path().apply {
-        moveTo(t0.x, t0.y); lineTo(t1.x, t1.y); lineTo(t2.x, t2.y); lineTo(t3.x, t3.y); close()
+    fun quad(a: Offset, b: Offset, c: Offset, d: Offset) = Path().apply {
+        moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(c.x, c.y); lineTo(d.x, d.y); close()
     }
 
-    // Painter's depth sorting of the 4 vertical faces using camera yaw
-    val rad = Math.toRadians(cameraYawDeg.toDouble())
-    val sinA = sin(rad).toFloat()
-    val cosA = cos(rad).toFloat()
-    val midX = (x0 + x1) / 2f
-    val midY = (y0 + y1) / 2f
-
-    data class VerticalFaceEntry(
-        val path: Path,
-        val depthScore: Float,
-        val baseColor: Color,
-        val gradStart: Offset,
-        val gradEnd: Offset
-    )
-
-    val verticalFaces = listOf(
-        // Back face (y = y0)
-        VerticalFaceEntry(
-            path = faceBack,
-            depthScore = midX * sinA + y0 * cosA,
-            baseColor = sideColor.darken(0.14f),
-            gradStart = t0,
-            gradEnd = b1
-        ),
-        // Left side panel (x = x0)
-        VerticalFaceEntry(
-            path = faceLeft,
-            depthScore = x0 * sinA + midY * cosA,
-            baseColor = sideColor.darken(0.06f),
-            gradStart = t0,
-            gradEnd = b3
-        ),
-        // Right side panel (x = x1)
-        VerticalFaceEntry(
-            path = faceRight,
-            depthScore = x1 * sinA + midY * cosA,
-            baseColor = sideColor,
-            gradStart = t1,
-            gradEnd = b2
-        ),
-        // Front face (y = y1)
-        VerticalFaceEntry(
-            path = faceFront,
-            depthScore = midX * sinA + y1 * cosA,
-            baseColor = frontColor,
-            gradStart = t3,
-            gradEnd = b2
-        )
-    ).sortedBy { it.depthScore }
-
+    val faceBottom = quad(b0, b1, b2, b3)
+    val faceTop = quad(t0, t1, t2, t3)
     val stroke = Stroke(width = strokeWidth)
 
-    if (!wireframeOnly) {
-        // 1. Bottom base panel
-        drawPath(faceBottom, sideColor.darken(0.22f))
-        drawPath(faceBottom, strokeColor.copy(alpha = 0.45f), style = stroke)
+    // اليوم الحقيقي للكاميرا: القيمة الممرّرة أو القيمة العامة للمشهد (كانت -34° ثابتة لمعظم الاستدعاءات)
+    val yaw = if (cameraYawDeg.isNaN()) SceneShading.yawDeg else cameraYawDeg
+    val rad = Math.toRadians(yaw.toDouble())
+    val sinA = sin(rad).toFloat()
+    val cosA = cos(rad).toFloat()
 
-        // 2. All 4 vertical faces (Back, Left Side, Right Side, Front) ordered back-to-front
-        verticalFaces.forEach { vf ->
+    // كل وجه رأسي: (المسار، عمودي الوجه nx/ny، اللون الأساسي، بداية/نهاية تدرّج AO)
+    class Face(
+        val path: Path,
+        val nx: Float,
+        val ny: Float,
+        val base: Color,
+        val topA: Offset,
+        val topB: Offset,
+        val botPt: Offset
+    ) {
+        // اتجاه العمودي بعد دوران الكاميرا: الموجب = يواجه المشاهد
+        val facing: Float get() = nx * sinA + ny * cosA
+    }
+
+    val faces = listOf(
+        Face(quad(b0, b1, t1, t0), 0f, -1f, sideColor, t0, t1, b0),   // خلفي (y0)
+        Face(quad(b0, b3, t3, t0), -1f, 0f, sideColor, t0, t3, b0),   // يسار (x0)
+        Face(quad(b1, b2, t2, t1), 1f, 0f, sideColor, t1, t2, b1),    // يمين (x1)
+        Face(quad(b3, b2, t2, t3), 0f, 1f, frontColor, t3, t2, b3)    // أمامي (y1)
+    )
+
+    fun lit(base: Color, nx: Float, ny: Float, nz: Float): Color {
+        val lambert = (nx * SceneShading.lightX + ny * SceneShading.lightY + nz * SceneShading.lightZ)
+            .coerceAtLeast(0f)
+        val k = (SceneShading.ambient + SceneShading.diffuse * lambert).coerceIn(0.35f, 1.25f)
+        val tinted = if (SceneShading.tintStrength > 0f) {
+            Color(
+                red = base.red + (SceneShading.tint.red - base.red) * SceneShading.tintStrength,
+                green = base.green + (SceneShading.tint.green - base.green) * SceneShading.tintStrength,
+                blue = base.blue + (SceneShading.tint.blue - base.blue) * SceneShading.tintStrength,
+                alpha = base.alpha
+            )
+        } else base
+        return Color(
+            red = (tinted.red * k).coerceIn(0f, 1f),
+            green = (tinted.green * k).coerceIn(0f, 1f),
+            blue = (tinted.blue * k).coerceIn(0f, 1f),
+            alpha = base.alpha
+        )
+    }
+
+    // إخفاء الأوجه الخلفية: يُرسم فقط ما يواجه الكاميرا، فيزول تداخل الأوجه الخاطئ مهما كانت زاوية الدوران
+    val visibleFaces = faces.filter { it.facing > 0.0001f }.sortedBy { it.facing }
+
+    if (!wireframeOnly) {
+        drawPath(faceBottom, sideColor.darken(0.30f))
+
+        visibleFaces.forEach { vf ->
+            val litBase = lit(vf.base, vf.nx, vf.ny, 0f)
+            // تدرّج رأسي: أفتح في الأعلى وأغمق قرب الأرض (إظلال محيط AO)
             drawPath(
                 path = vf.path,
                 brush = Brush.linearGradient(
-                    colors = listOf(vf.baseColor.lighten(0.08f), vf.baseColor, vf.baseColor.darken(0.12f)),
-                    start = vf.gradStart,
-                    end = vf.gradEnd
+                    colors = listOf(litBase.lighten(0.07f), litBase, litBase.darken(0.16f)),
+                    start = vf.topA,
+                    end = vf.botPt
                 )
             )
+            // لمعة مشعّة ناعمة على الوجه عند تقابله مع الضوء
+            val gloss = (vf.nx * SceneShading.lightX + vf.ny * SceneShading.lightY).coerceAtLeast(0f)
+            if (gloss > 0.35f) {
+                drawPath(vf.path, Color.White.copy(alpha = ((gloss - 0.35f) * 0.10f).coerceIn(0f, 0.08f)))
+            }
             drawPath(vf.path, strokeColor, style = stroke)
         }
 
-        // 3. Top panel
+        // السطح العلوي: يستقبل أكبر قدر من الضوء + لمعة انعكاس قطرية
+        val topLit = lit(topColor, 0f, 0f, 1f)
         drawPath(
             path = faceTop,
             brush = Brush.linearGradient(
-                colors = listOf(topColor.lighten(0.14f), topColor, topColor.darken(0.06f)),
+                colors = listOf(topLit.lighten(0.12f), topLit, topLit.darken(0.07f)),
                 start = t0,
                 end = t2
             )
         )
+        val sheenA = Offset(t0.x + (t1.x - t0.x) * 0.18f, t0.y + (t1.y - t0.y) * 0.18f)
+        val sheenB = Offset(t3.x + (t2.x - t3.x) * 0.42f, t3.y + (t2.y - t3.y) * 0.42f)
+        drawLine(Color.White.copy(alpha = 0.10f), sheenA, sheenB, strokeWidth = (strokeWidth * 3.2f).coerceAtLeast(3f))
         drawPath(faceTop, strokeColor, style = stroke)
 
-        // Subtle Fresnel top bevel specular highlight on front-top edge
-        drawLine(
-            color = Color.White.copy(alpha = 0.28f),
-            start = t3,
-            end = t2,
-            strokeWidth = 1.6f
-        )
+        // حافة مضيئة (Fresnel) على الحافة الأمامية العليا للوجوه المرئية
+        visibleFaces.forEach { vf ->
+            drawLine(
+                color = Color.White.copy(alpha = 0.26f),
+                start = vf.topA,
+                end = vf.topB,
+                strokeWidth = 1.4f
+            )
+        }
     } else {
         drawPath(faceBottom, sideColor.copy(alpha = 0.18f))
-        verticalFaces.forEach { vf ->
-            drawPath(vf.path, vf.baseColor.copy(alpha = 0.28f))
+        faces.forEach { vf ->
+            drawPath(vf.path, vf.base.copy(alpha = 0.28f))
             drawPath(vf.path, strokeColor, style = stroke)
         }
         drawPath(faceTop, topColor.copy(alpha = 0.45f))
