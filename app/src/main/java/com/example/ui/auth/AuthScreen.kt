@@ -104,7 +104,7 @@ fun attemptAutoSignIn(
         return
     }
     val clientId = try {
-        context.getString(R.string.default_web_client_id)
+        requireWebClientId(context)
     } catch (e: Exception) {
         onUnauthenticated()
         return
@@ -138,6 +138,17 @@ fun attemptAutoSignIn(
     }
 }
 
+/**
+ * يقرأ default_web_client_id بالاسم وقت التشغيل.
+ * هذا المورد يولّده مكوّن google-services من google-services.json؛ وعند غيابه لا يوجد R.string.default_web_client_id
+ * فيفشل التجميع. القراءة بالاسم تبني دائماً، وتُرمى استثناء (يُلتقط أعلاه) عند عدم وجود الإعداد.
+ */
+private fun requireWebClientId(context: Context): String {
+    val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+    require(resId != 0) { "default_web_client_id غير موجود (أضف google-services.json)" }
+    return context.getString(resId)
+}
+
 fun onGoogleSignInClicked(
     context: Context,
     credentialManager: CredentialManager,
@@ -147,7 +158,7 @@ fun onGoogleSignInClicked(
     onAuthCancelled: () -> Unit = {}
 ) {
     val clientId = try {
-        context.getString(R.string.default_web_client_id)
+        requireWebClientId(context)
     } catch (e: Exception) {
         onAuthError("إعدادات تسجيل الدخول غير مكتملة: default_web_client_id")
         return
